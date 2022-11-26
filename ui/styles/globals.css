@@ -25,3 +25,13 @@ a {
     background: black;
   }
 }
+
+.main {
+  margin: auto;
+  margin-top: 200px;
+  text-align: center;
+  width: 400px;
+}
+pre {
+  text-align: left;
+}

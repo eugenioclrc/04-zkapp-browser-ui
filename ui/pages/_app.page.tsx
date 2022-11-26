@@ -9,8 +9,13 @@ import {
 } from 'snarkyjs'
 let transactionFee = 0.1;
 
+let logLines:String[] = [];
 
-
+function log(t:String) {
+  console.log(t);
+  logLines.push(String(t));
+  logLines = [...logLines, String(t)].slice(-8);
+}
 
 export default function App() {
 
@@ -32,9 +37,11 @@ export default function App() {
     (async () => {
       if (!state.hasBeenSetup) {
         const zkappWorkerClient = new ZkappWorkerClient();
-        console.log('Loading SnarkyJS...');
+        log('Loading SnarkyJS...');
+        logLines.push('Loading SnarkyJS...');
         await zkappWorkerClient.loadSnarkyJS();
-        console.log('done');
+        log('done');
+        logLines.push('done');
         await zkappWorkerClient.setActiveInstanceToBerkeley();
         const mina = (window as any).mina;
         if (mina == null) {
@@ -43,22 +50,28 @@ export default function App() {
         }
         const publicKeyBase58 : string = (await mina.requestAccounts())[0];
         const publicKey = PublicKey.fromBase58(publicKeyBase58);
-        console.log('using key', publicKey.toBase58());
-        console.log('checking if account exists...');
+        log('using key', publicKey.toBase58());
+        logLines.push('using key', publicKey.toBase58());
+        log('checking if account exists...');
+        logLines.push('checking if account exists...');
         const res = await zkappWorkerClient.fetchAccount({ publicKey: publicKey! });
         
         const accountExists = res.error == null;
         await zkappWorkerClient.loadContract();
-        console.log('compiling zkApp');
+        log('compiling zkApp');
+        logLines.push('compiling zkApp');
         await zkappWorkerClient.compileContract();
-        console.log('zkApp compiled');
+        log('zkApp compiled');
+        logLines.push('zkApp compiled');
         const zkappPublicKey = PublicKey.fromBase58('B62qjWyntdizupF44kn1ZfRB6d7kn43ftqsWoW9nddemg3LcUcknTsr');
         await zkappWorkerClient.initZkappInstance(zkappPublicKey);
-        console.log('getting zkApp state...');
+        log('getting zkApp state...');
+        logLines.push('getting zkApp state...');
         await zkappWorkerClient.fetchAccount({ publicKey: zkappPublicKey })
         const currentNum = await zkappWorkerClient.getNum();
         
-        console.log('current state:', currentNum.toString());
+        log('current state:', currentNum.toString());
+        logLines.push('current state:', currentNum.toString());
         setState({
             ...state,
             zkappWorkerClient, 
@@ -79,7 +92,7 @@ export default function App() {
     (async () => {
       if (state.hasBeenSetup && !state.accountExists) {
         for (;;) {
-          console.log('checking if account exists...');
+          log('checking if account exists...');
           const res = await state.zkappWorkerClient!.fetchAccount({ publicKey: state.publicKey! })
           const accountExists = res.error == null;
           if (accountExists) {
@@ -97,14 +110,14 @@ export default function App() {
   // Send a transaction
   const onSendTransaction = async () => {
     setState({ ...state, creatingTransaction: true });
-    console.log('sending a transaction...');
+    log('sending a transaction...');
     await state.zkappWorkerClient!.fetchAccount({ publicKey: state.publicKey! });
     await state.zkappWorkerClient!.createUpdateTransaction();
-    console.log('creating proof...');
+    log('creating proof...');
     await state.zkappWorkerClient!.proveUpdateTransaction();
-    console.log('getting Transaction JSON...');
+    log('getting Transaction JSON...');
     const transactionJSON = await state.zkappWorkerClient!.getTransactionJSON()
-    console.log('requesting send transaction...');
+    log('requesting send transaction...');
     const { hash } = await (window as any).mina.sendTransaction({
       transaction: transactionJSON,
       feePayer: {
@@ -112,7 +125,7 @@ export default function App() {
         memo: '',
       },
     });
-    console.log(
+    log(
       'See transaction at https://berkeley.minaexplorer.com/transaction/' + hash
     );
     setState({ ...state, creatingTransaction: false });
@@ -122,10 +135,10 @@ export default function App() {
   // -------------------------------------------------------
   // Refresh the current state
   const onRefreshCurrentNum = async () => {
-    console.log('getting zkApp state...');
+    log('getting zkApp state...');
     await state.zkappWorkerClient!.fetchAccount({ publicKey: state.zkappPublicKey! })
     const currentNum = await state.zkappWorkerClient!.getNum();
-    console.log('current state:', currentNum.toString());
+    log('current state:', currentNum.toString());
     setState({ ...state, currentNum });
   }
   // -------------------------------------------------------...
@@ -157,9 +170,16 @@ export default function App() {
       <button onClick={onRefreshCurrentNum}> Get Latest State </button>
     </div>
   }
-  return <div>
+  return <div className="main">
    { setup }
    { accountDoesNotExist }
    { mainContent }
+   <hr />
+   <h3>Logs</h3>
+
+   <pre>
+    Please check console tab in browser dev tools
+    { logLines.map((e, i) => <div key={i}>{e}</div>) }
+    </pre>
   </div>
 }
