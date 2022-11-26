@@ -9,16 +9,9 @@ import {
 } from 'snarkyjs'
 let transactionFee = 0.1;
 
-let logLines:String[] = [];
-
-function log(t:String) {
-  console.log(t);
-  logLines.push(String(t));
-  logLines = [...logLines, String(t)].slice(-8);
-}
 
 export default function App() {
-
+  const logLines:string[] = [];
   let [state, setState] = useState({
     zkappWorkerClient: null as null | ZkappWorkerClient,
     hasWallet: null as null | boolean,
@@ -28,20 +21,34 @@ export default function App() {
     publicKey: null as null | PublicKey,
     zkappPublicKey: null as null | PublicKey,
     creatingTransaction: false,
+    logLines,
   });
 
 
+  const log = (t:String) => {
+      console.log(t);
+      setState({
+        zkappWorkerClient: state.zkappWorkerClient,
+        hasWallet: state.hasWallet,
+        hasBeenSetup: state.hasBeenSetup,
+        accountExists: state.accountExists,
+        currentNum: state.currentNum,
+        publicKey: state.publicKey,
+        zkappPublicKey: state.zkappPublicKey,
+        creatingTransaction: state.creatingTransaction,
+        logLines: [...state.logLines, String(t)].slice(-8)
+      })
+    };
   // -------------------------------------------------------
   // Do Setup
   useEffect(() => {
+    
     (async () => {
       if (!state.hasBeenSetup) {
         const zkappWorkerClient = new ZkappWorkerClient();
         log('Loading SnarkyJS...');
-        logLines.push('Loading SnarkyJS...');
         await zkappWorkerClient.loadSnarkyJS();
         log('done');
-        logLines.push('done');
         await zkappWorkerClient.setActiveInstanceToBerkeley();
         const mina = (window as any).mina;
         if (mina == null) {
@@ -50,28 +57,22 @@ export default function App() {
         }
         const publicKeyBase58 : string = (await mina.requestAccounts())[0];
         const publicKey = PublicKey.fromBase58(publicKeyBase58);
-        log('using key', publicKey.toBase58());
-        logLines.push('using key', publicKey.toBase58());
+        log('using key ' + publicKey.toBase58());
         log('checking if account exists...');
-        logLines.push('checking if account exists...');
         const res = await zkappWorkerClient.fetchAccount({ publicKey: publicKey! });
         
         const accountExists = res.error == null;
         await zkappWorkerClient.loadContract();
         log('compiling zkApp');
-        logLines.push('compiling zkApp');
         await zkappWorkerClient.compileContract();
         log('zkApp compiled');
-        logLines.push('zkApp compiled');
         const zkappPublicKey = PublicKey.fromBase58('B62qjWyntdizupF44kn1ZfRB6d7kn43ftqsWoW9nddemg3LcUcknTsr');
         await zkappWorkerClient.initZkappInstance(zkappPublicKey);
         log('getting zkApp state...');
-        logLines.push('getting zkApp state...');
         await zkappWorkerClient.fetchAccount({ publicKey: zkappPublicKey })
         const currentNum = await zkappWorkerClient.getNum();
         
-        log('current state:', currentNum.toString());
-        logLines.push('current state:', currentNum.toString());
+        log('current state: ' + currentNum.toString());
         setState({
             ...state,
             zkappWorkerClient, 
@@ -138,7 +139,7 @@ export default function App() {
     log('getting zkApp state...');
     await state.zkappWorkerClient!.fetchAccount({ publicKey: state.zkappPublicKey! })
     const currentNum = await state.zkappWorkerClient!.getNum();
-    log('current state:', currentNum.toString());
+    log('current state: ' + currentNum.toString());
     setState({ ...state, currentNum });
   }
   // -------------------------------------------------------...
